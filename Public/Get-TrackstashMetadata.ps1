@@ -3,8 +3,9 @@
 Extracts and normalizes audio metadata using psMusicTagger.
 
 .DESCRIPTION
-Calls Get-MusicMetadata and maps tag fields to a consistent schema expected by
-trackstash-scan. Missing values are normalized to null where applicable.
+Calls psMusicTagger metadata cmdlets and maps tag fields to a consistent schema
+expected by trackstash-scan. Missing values are normalized to null where
+applicable.
 
 .PARAMETER Path
 Path to the media file.
@@ -22,25 +23,62 @@ function Get-TrackstashMetadata {
         [string]$Path
     )
 
-    $raw = Get-MusicMetadata -Path $Path -ErrorAction Stop
-
-    $artworkHash = $null
-    if ($null -ne $raw.PSObject.Properties['ArtworkHash']) {
-        $artworkHash = $raw.ArtworkHash
+    if (Get-Command -Name 'Get-MusicMetadata' -ErrorAction SilentlyContinue) {
+        $raw = Get-MusicMetadata -Path $Path -ErrorAction Stop
+    }
+    elseif (Get-Command -Name 'Get-TrackMetadata' -ErrorAction SilentlyContinue) {
+        $raw = Get-TrackMetadata -FilePath $Path -ErrorAction Stop
+    }
+    else {
+        throw 'No supported metadata cmdlet found. Expected Get-MusicMetadata or Get-TrackMetadata from psMusicTagger.'
     }
 
+    function Get-TagValue {
+        param(
+            [Parameter(Mandatory)]
+            [object]$Source,
+            [Parameter(Mandatory)]
+            [string[]]$Names
+        )
+
+        foreach ($name in $Names) {
+            $prop = $Source.PSObject.Properties[$name]
+            if ($null -ne $prop) {
+                return $prop.Value
+            }
+        }
+
+        return $null
+    }
+
+    function Normalize-TagValue {
+        param([object]$Value)
+
+        if ($null -eq $Value) {
+            return $null
+        }
+
+        if ($Value -is [string] -and [string]::IsNullOrWhiteSpace($Value)) {
+            return $null
+        }
+
+        return $Value
+    }
+
+    $artworkHash = Get-TagValue -Source $raw -Names @('ArtworkHash')
+
     return [pscustomobject]@{
-        Artist      = $raw.Artist
-        Title       = $raw.Title
-        Album       = $raw.Album
-        Label       = $raw.Label
-        Release     = $raw.Release
-        TrackNumber = if ($raw.TrackNumber -eq '') { $null } else { $raw.TrackNumber }
-        DiscNumber  = if ($raw.DiscNumber -eq '') { $null } else { $raw.DiscNumber }
-        BPM         = if ($raw.BPM -eq '') { $null } else { $raw.BPM }
-        Key         = $raw.Key
-        Genre       = $raw.Genre
-        Year        = if ($raw.Year -eq '') { $null } else { $raw.Year }
-        ArtworkHash = $artworkHash
+        Artist      = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Artist', 'AlbumArtist'))
+        Title       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Title'))
+        Album       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Album'))
+        Label       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Label', 'Publisher'))
+        Release     = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Release'))
+        TrackNumber = Normalize-TagValue (Get-TagValue -Source $raw -Names @('TrackNumber', 'Track'))
+        DiscNumber  = Normalize-TagValue (Get-TagValue -Source $raw -Names @('DiscNumber', 'Disc'))
+        BPM         = Normalize-TagValue (Get-TagValue -Source $raw -Names @('BPM', 'Tempo'))
+        Key         = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Key', 'InitialKey'))
+        Genre       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Genre'))
+        Year        = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Year', 'Date'))
+        ArtworkHash = Normalize-TagValue $artworkHash
     }
 }

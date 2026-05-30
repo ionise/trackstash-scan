@@ -4,18 +4,25 @@ You are assisting with the implementation of **trackstash-scan**, a standalone P
 
 ## Purpose
 trackstash-scan has ONE responsibility:
-Scan the filesystem for audio media files, extract metadata using the existing **psMusicTagger** module, compute file hashes and AcoustID-compatible fingerprints, and store the results in a SQLite database.
+Scan the filesystem for audio media files, extract metadata using the existing **psMusicTagger** module.
+Compute file hashes. 
+Compute AcoustID-compatible fingerprints using existing **psAcoustID** module
+Store the results in a SQLite database.
 
 ## Mandatory Dependencies
 - The PowerShell module **psMusicTagger** (https://github.com/ionise/psmusictagger)
-- Copilot must call psMusicTagger cmdlets instead of reimplementing metadata parsing or fingerprinting.
+- The PowerShell module **PsAcoustId** (https://www.powershellgallery.com/packages/PsAcoustId/0.1.0)
+- Copilot must call psMusicTagger cmdlets for metadata parsing and PsAcoustId cmdlets for fingerprinting.
 
 ## Required psMusicTagger Cmdlets
 Use these cmdlets directly:
 - `Get-MusicMetadata` — extract embedded tags
-- `Get-AudioFingerprint` — compute Chromaprint/AcoustID-compatible fingerprint
 - `Get-AudioDuration` — duration helper
 - Any other psMusicTagger utilities as needed
+
+## Required PsAcoustId Cmdlets
+Use these cmdlets directly:
+- `Get-AcoustIDFingerprint` — compute Chromaprint/AcoustID-compatible fingerprint
 
 Copilot must NOT write its own tag readers or fingerprinting logic.
 
@@ -37,7 +44,7 @@ Copilot must NOT write its own tag readers or fingerprinting logic.
 ### 3. File identity
 - Compute a stable file hash (SHA256 or xxHash64).
 - Compute fingerprint using:
-  - `Get-AudioFingerprint -Path <file>`
+  - `Get-AcoustIDFingerprint -Path <file>`
 - Store both raw fingerprint and AcoustID submission hash if needed.
 
 ### 4. Database storage (SQLite)

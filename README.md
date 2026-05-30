@@ -19,6 +19,7 @@ trackstash-scan is a PowerShell 7.4+ scanner that:
 
 - PowerShell 7.4+
 - psMusicTagger module available in the PowerShell session
+- PsAcoustId module available in the PowerShell session
 - Microsoft.Data.Sqlite assembly available to PowerShell
 - Pester 5 (for running tests)
 
@@ -151,3 +152,4 @@ Invoke-Pester -Path ./Tests -Output Detailed
 - Missing tags are written as SQL `NULL`.
 - If artwork hash is not exposed by psMusicTagger metadata output, `artwork_hash` remains `NULL`.
 - Scanning continues when an individual file fails; errors are logged.
+- For some PsAcoustId environments, FLAC/MP3 reader support may be unavailable. When this happens and `ffmpeg` is installed, trackstash-scan auto-converts to temporary WAV and retries fingerprinting.

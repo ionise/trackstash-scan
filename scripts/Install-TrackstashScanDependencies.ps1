@@ -5,9 +5,10 @@
 Bootstraps first-run dependencies for trackstash-scan.
 
 .DESCRIPTION
-Installs psMusicTagger from PSGallery and downloads Microsoft.Data.Sqlite.Core plus
-required SQLitePCLRaw packages from NuGet. Copies managed and native SQLite assets
-into the local Dependencies folder used by the module.
+Installs psMusicTagger and PsAcoustId from PSGallery and downloads
+Microsoft.Data.Sqlite.Core plus required SQLitePCLRaw packages from NuGet.
+Copies managed and native SQLite assets into the local Dependencies folder used
+by the module.
 
 .PARAMETER Scope
 Install scope for psMusicTagger. CurrentUser by default.
@@ -121,6 +122,17 @@ $installModuleParams = @{
     ErrorAction  = 'Stop'
 }
 Install-Module @installModuleParams
+
+Write-Step 'Installing PsAcoustId from PSGallery.'
+$installAcoustIdParams = @{
+    Name         = 'PsAcoustId'
+    Repository   = 'PSGallery'
+    Scope        = $Scope
+    Force        = [bool]$Force
+    AllowClobber = $true
+    ErrorAction  = 'Stop'
+}
+Install-Module @installAcoustIdParams
 
 Write-Step "Downloading Microsoft.Data.Sqlite.Core v$SqliteVersion from NuGet."
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("trackstash-scan-bootstrap-" + [guid]::NewGuid().ToString('N'))

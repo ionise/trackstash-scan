@@ -3,28 +3,22 @@ Describe 'Get-TrackstashFingerprint' {
         Import-Module "$PSScriptRoot/../trackstash-scan.psd1" -Force
     }
 
-    It 'returns fingerprint and duration from psMusicTagger cmdlets' {
+    It 'returns fingerprint and duration from PsAcoustId cmdlet output' {
         InModuleScope trackstash-scan {
-            if (-not (Get-Command -Name Get-AudioFingerprint -ErrorAction SilentlyContinue)) {
-                function Get-AudioFingerprint {
+            if (-not (Get-Command -Name Get-AcoustIDFingerprint -ErrorAction SilentlyContinue)) {
+                function Get-AcoustIDFingerprint {
                     param([string]$Path)
-                    throw 'Get-AudioFingerprint stub should be mocked in tests.'
-                }
-            }
-            if (-not (Get-Command -Name Get-AudioDuration -ErrorAction SilentlyContinue)) {
-                function Get-AudioDuration {
-                    param([string]$Path)
-                    throw 'Get-AudioDuration stub should be mocked in tests.'
+                    throw 'Get-AcoustIDFingerprint stub should be mocked in tests.'
                 }
             }
 
-            Mock -CommandName Get-AudioFingerprint -MockWith {
+            Mock -CommandName Get-AcoustIDFingerprint -MockWith {
                 [pscustomobject]@{
                     Fingerprint = 'raw-fingerprint'
+                    Duration    = 123.45
                 }
             }
 
-            Mock -CommandName Get-AudioDuration -MockWith { 123.45 }
             Mock -CommandName Get-Command -MockWith { $null } -ParameterFilter { $Name -eq 'Get-AcoustIdSubmissionHash' }
 
             $result = Get-TrackstashFingerprint -Path '/tmp/fake.mp3'
