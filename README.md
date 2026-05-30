@@ -34,13 +34,16 @@ Optional parameters:
 
 - `-Scope CurrentUser|AllUsers` for psMusicTagger install scope (default `CurrentUser`)
 - `-SqliteVersion <version>` to pin Microsoft.Data.Sqlite package version
+- `-SQLitePCLRawVersion <version>` to pin SQLitePCLRaw dependency version
 - `-Force` to force reinstall/overwrite
 
 Example:
 
 ```powershell
-pwsh ./scripts/Install-TrackstashScanDependencies.ps1 -Scope CurrentUser -SqliteVersion 8.0.7 -Force
+pwsh ./scripts/Install-TrackstashScanDependencies.ps1 -Scope CurrentUser -SqliteVersion 9.0.16 -SQLitePCLRawVersion 2.1.10 -Force
 ```
+
+If bootstrap fails, rerun with `-Force` and share the full output.
 
 ## Project Layout
 

@@ -43,20 +43,41 @@ function Invoke-SqliteQuery {
 
     $sqliteLoaded = $false
     $moduleRoot = Split-Path -Path $PSScriptRoot -Parent
-    $localDllCandidates = @(
+    $localManagedDllCandidates = @(
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/SQLitePCLRaw.core.dll'),
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/SQLitePCLRaw.provider.dynamic_cdecl.dll'),
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/SQLitePCLRaw.provider.e_sqlite3.dll'),
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/SQLitePCLRaw.batteries_v2.dll'),
         (Join-Path $moduleRoot 'Dependencies/Microsoft.Data.Sqlite/Microsoft.Data.Sqlite.dll')
     )
 
-    foreach ($dllPath in $localDllCandidates) {
+    foreach ($dllPath in $localManagedDllCandidates) {
         if (Test-Path -LiteralPath $dllPath) {
             try {
                 Add-Type -Path $dllPath -ErrorAction Stop
-                $sqliteLoaded = $true
-                break
+                if ((Split-Path -Path $dllPath -Leaf) -eq 'Microsoft.Data.Sqlite.dll') {
+                    $sqliteLoaded = $true
+                }
             }
             catch {
                 continue
             }
+        }
+    }
+
+    $nativeCandidates = @(
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/native/e_sqlite3.dll'),
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/native/libe_sqlite3.so'),
+        (Join-Path $moduleRoot 'Dependencies/SQLitePCLRaw/native/libe_sqlite3.dylib')
+    )
+
+    $nativeToLoad = $nativeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if ($nativeToLoad) {
+        try {
+            [System.Runtime.InteropServices.NativeLibrary]::Load($nativeToLoad) | Out-Null
+        }
+        catch {
+            # Best effort. If this fails, provider initialization may still locate native binaries.
         }
     }
 
@@ -67,6 +88,16 @@ function Invoke-SqliteQuery {
         }
         catch {
             throw "Microsoft.Data.Sqlite assembly is required but could not be loaded. Run scripts/Install-TrackstashScanDependencies.ps1 or install the package manually. Error: $($_.Exception.Message)"
+        }
+    }
+
+    $batteriesType = [type]::GetType('SQLitePCL.Batteries_V2, SQLitePCLRaw.batteries_v2', $false)
+    if ($null -ne $batteriesType) {
+        try {
+            $batteriesType::Init()
+        }
+        catch {
+            # Do not fail here; connection open will surface any provider errors.
         }
     }
 
