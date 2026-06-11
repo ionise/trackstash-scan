@@ -23,11 +23,11 @@ function Get-TrackstashMetadata {
         [string]$Path
     )
 
-    if (Get-Command -Name 'Get-MusicMetadata' -ErrorAction SilentlyContinue) {
-        $raw = Get-MusicMetadata -Path $Path -ErrorAction Stop
-    }
-    elseif (Get-Command -Name 'Get-TrackMetadata' -ErrorAction SilentlyContinue) {
+    if (Get-Command -Name 'Get-TrackMetadata' -ErrorAction SilentlyContinue) {
         $raw = Get-TrackMetadata -FilePath $Path -ErrorAction Stop
+    }
+    elseif (Get-Command -Name 'Get-MusicMetadata' -ErrorAction SilentlyContinue) {
+        $raw = Get-MusicMetadata -Path $Path -ErrorAction Stop
     }
     else {
         throw 'No supported metadata cmdlet found. Expected Get-MusicMetadata or Get-TrackMetadata from psMusicTagger.'
@@ -44,7 +44,16 @@ function Get-TrackstashMetadata {
         foreach ($name in $Names) {
             $prop = $Source.PSObject.Properties[$name]
             if ($null -ne $prop) {
-                return $prop.Value
+                $value = $prop.Value
+                if ($null -eq $value) {
+                    continue
+                }
+
+                if ($value -is [string] -and [string]::IsNullOrWhiteSpace($value)) {
+                    continue
+                }
+
+                return $value
             }
         }
 
@@ -66,16 +75,24 @@ function Get-TrackstashMetadata {
     }
 
     $artworkHash = Get-TagValue -Source $raw -Names @('ArtworkHash')
+    $album = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Album'))
+    $release = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Release'))
+    if ($null -eq $release) {
+        $release = $album
+    }
 
     return [pscustomobject]@{
         Artist      = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Artist', 'AlbumArtist'))
         Title       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Title'))
-        Album       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Album'))
+        Album       = $album
         Label       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Label', 'Publisher'))
-        Release     = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Release'))
+        Release     = $release
+        Isrc        = Normalize-TagValue (Get-TagValue -Source $raw -Names @('ISRC', 'Isrc'))
+        Barcode     = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Barcode', 'UPC', 'EAN'))
+        CatalogNumber = Normalize-TagValue (Get-TagValue -Source $raw -Names @('CatalogNumber', 'CatalogNo', 'Catalog', 'CatNo', 'CATALOG_NUMBER'))
         TrackNumber = Normalize-TagValue (Get-TagValue -Source $raw -Names @('TrackNumber', 'Track'))
         DiscNumber  = Normalize-TagValue (Get-TagValue -Source $raw -Names @('DiscNumber', 'Disc'))
-        BPM         = Normalize-TagValue (Get-TagValue -Source $raw -Names @('BPM', 'Tempo'))
+        BPM         = Normalize-TagValue (Get-TagValue -Source $raw -Names @('BPM', 'Tempo', 'BeatsPerMinute'))
         Key         = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Key', 'InitialKey'))
         Genre       = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Genre'))
         Year        = Normalize-TagValue (Get-TagValue -Source $raw -Names @('Year', 'Date'))

@@ -14,6 +14,9 @@ foreach ($script in $publicScripts) {
 
 Export-ModuleMember -Function @(
     'Start-TrackstashScan',
+    'Get-TrackstashScanCheckpointStatus',
+    'Get-TrackstashRecord',
+    'Get-TrackstashLibrary',
     'Get-TrackstashMediaFiles',
     'Get-TrackstashFileHash',
     'Get-TrackstashMetadata',

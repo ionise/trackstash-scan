@@ -15,6 +15,9 @@
 
     FunctionsToExport = @(
         'Start-TrackstashScan',
+        'Get-TrackstashScanCheckpointStatus',
+        'Get-TrackstashRecord',
+        'Get-TrackstashLibrary',
         'Get-TrackstashMediaFiles',
         'Get-TrackstashFileHash',
         'Get-TrackstashMetadata',

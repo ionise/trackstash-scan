@@ -95,6 +95,9 @@ INSERT INTO metadata (
     album,
     label,
     release,
+    isrc,
+    barcode,
+    catalog_number,
     track_number,
     disc_number,
     bpm,
@@ -110,6 +113,9 @@ VALUES (
     @album,
     @label,
     @release,
+    @isrc,
+    @barcode,
+    @catalog_number,
     @track_number,
     @disc_number,
     @bpm,
@@ -125,6 +131,9 @@ DO UPDATE SET
     album = excluded.album,
     label = excluded.label,
     release = excluded.release,
+    isrc = excluded.isrc,
+    barcode = excluded.barcode,
+    catalog_number = excluded.catalog_number,
     track_number = excluded.track_number,
     disc_number = excluded.disc_number,
     bpm = excluded.bpm,
@@ -141,6 +150,9 @@ DO UPDATE SET
         album         = $Metadata.Album
         label         = $Metadata.Label
         release       = $Metadata.Release
+        isrc          = $Metadata.Isrc
+        barcode       = $Metadata.Barcode
+        catalog_number = $Metadata.CatalogNumber
         track_number  = $Metadata.TrackNumber
         disc_number   = $Metadata.DiscNumber
         bpm           = $Metadata.BPM

@@ -76,6 +76,8 @@ Parameters:
 - `-DatabasePath <string>`: SQLite file path (default `./trackstash-scan.db`)
 - `-Recurse`: recurse through subdirectories
 - `-ForceRescan`: recompute metadata and fingerprint even if hash exists
+- `-Resume`: reuse SQLite checkpoints to skip files already processed in a previous interrupted run
+- `-ShowProgress`: show a progress bar while scanning
 - `-Verbose`: write informational logs
 - `-WhatIf`: dry-run mode through ShouldProcess
 
@@ -85,6 +87,7 @@ Examples:
 pwsh ./CLI/trackstash-scan.ps1 -Root '/Volumes/Music' -Recurse
 pwsh ./CLI/trackstash-scan.ps1 -Root '/Volumes/Music','/Volumes/Archive' -Recurse -DatabasePath './data/trackstash-scan.db'
 pwsh ./CLI/trackstash-scan.ps1 -Root '/Volumes/Music' -Recurse -ForceRescan -Verbose
+pwsh ./CLI/trackstash-scan.ps1 -Root '/Volumes/Music' -Recurse -Resume -ShowProgress
 pwsh ./CLI/trackstash-scan.ps1 -Root '/Volumes/Music' -Recurse -WhatIf
 ```
 
@@ -94,6 +97,14 @@ Start a scan:
 
 ```powershell
 Start-TrackstashScan -Root '/path/to/music' -Recurse -DatabasePath './trackstash-scan.db'
+Start-TrackstashScan -Root '/path/to/music' -Recurse -Resume -ShowProgress
+```
+
+Check resume checkpoint status:
+
+```powershell
+Get-TrackstashScanCheckpointStatus -DatabasePath './trackstash-scan.db'
+Get-TrackstashScanCheckpointStatus -DatabasePath './trackstash-scan.db' -Root '/Volumes/music/Backup' -IncludeRecentPaths
 ```
 
 List candidate media files only:
@@ -120,7 +131,25 @@ Extract fingerprint data:
 Get-TrackstashFingerprint -Path '/path/to/file.ogg'
 ```
 
+Query stored records:
+
+```powershell
+Get-TrackstashRecord -DatabasePath './trackstash-scan.db' -Artist 'Calibre'
+Get-TrackstashRecord -Search 'Hospital Records' -Genre 'Drum & Bass' -MinYear 2015
+Get-TrackstashRecord -CatalogNumber 'NHS001' -ExactMatch
+```
+
 ## Database Schema
+
+Planned schema evolution documents:
+
+- [../trackstash-core/docs/ecosystem-modules.md](../trackstash-core/docs/ecosystem-modules.md)
+- [../trackstash-core/docs/schema-conventions.md](../trackstash-core/docs/schema-conventions.md)
+- [../trackstash-core/docs/label-schema.md](../trackstash-core/docs/label-schema.md)
+- [../trackstash-core/docs/release-schema.md](../trackstash-core/docs/release-schema.md)
+- [../trackstash-core/docs/artist-schema.md](../trackstash-core/docs/artist-schema.md)
+- [../trackstash-core/docs/recording-schema.md](../trackstash-core/docs/recording-schema.md)
+- [../trackstash-core/docs/media-matching-schema.md](../trackstash-core/docs/media-matching-schema.md)
 
 Tables:
 
@@ -141,6 +170,24 @@ Tables:
 
 `metadata` stores normalized tags keyed by `media_file_id`.
 
+`metadata` fields:
+
+- `artist`
+- `title`
+- `album`
+- `label`
+- `release`
+- `isrc`
+- `barcode`
+- `catalog_number`
+- `track_number`
+- `disc_number`
+- `bpm`
+- `musical_key`
+- `genre`
+- `year`
+- `artwork_hash`
+
 ## Running Tests
 
 ```powershell
@@ -151,5 +198,5 @@ Invoke-Pester -Path ./Tests -Output Detailed
 
 - Missing tags are written as SQL `NULL`.
 - If artwork hash is not exposed by psMusicTagger metadata output, `artwork_hash` remains `NULL`.
-- Scanning continues when an individual file fails; errors are logged.
+- Scanning continues when an individual file fails; errors are logged as non-terminating error records.
 - For some PsAcoustId environments, FLAC/MP3 reader support may be unavailable. When this happens and `ffmpeg` is installed, trackstash-scan auto-converts to temporary WAV and retries fingerprinting.

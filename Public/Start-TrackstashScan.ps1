@@ -19,6 +19,13 @@ When set, scans subdirectories recursively.
 .PARAMETER ForceRescan
 When set, reprocesses files even if content hash already exists.
 
+.PARAMETER ShowProgress
+When set, displays PowerShell progress output while scanning.
+
+.PARAMETER Resume
+When set, uses scan checkpoints stored in SQLite to skip already processed
+files from previous interrupted runs.
+
 .OUTPUTS
 PSCustomObject scan summary with counts and timestamps.
 
@@ -38,10 +45,17 @@ function Start-TrackstashScan {
         [switch]$Recurse,
 
         [Parameter()]
-        [switch]$ForceRescan
+        [switch]$ForceRescan,
+
+        [Parameter()]
+        [switch]$ShowProgress,
+
+        [Parameter()]
+        [switch]$Resume
     )
 
     $dbPath = Initialize-TrackstashDatabase -DatabasePath $DatabasePath
+    $resolvedRoots = @($Root | ForEach-Object { [System.IO.Path]::GetFullPath($_) })
 
     $summary = [ordered]@{
         DatabasePath = $dbPath
@@ -56,13 +70,96 @@ function Start-TrackstashScan {
     $mediaFiles = @(Get-TrackstashMediaFiles -Root $Root -Recurse:$Recurse)
     $summary.TotalFiles = $mediaFiles.Count
 
-    foreach ($file in $mediaFiles) {
+    function Resolve-ScanRoot {
+        param(
+            [Parameter(Mandatory)]
+            [string]$FilePath,
+            [Parameter(Mandatory)]
+            [string[]]$ScanRoots
+        )
+
+        $matchingRoots = @(
+            $ScanRoots |
+                Where-Object {
+                    $FilePath -eq $_ -or $FilePath.StartsWith($_ + [System.IO.Path]::DirectorySeparatorChar)
+                } |
+                Sort-Object Length -Descending
+        )
+
+        if ($matchingRoots.Count -gt 0) {
+            return $matchingRoots[0]
+        }
+
+        return [System.IO.Path]::GetDirectoryName($FilePath)
+    }
+
+    function Save-ScanCheckpoint {
+        param(
+            [Parameter(Mandatory)]
+            [string]$CheckpointRoot,
+            [Parameter(Mandatory)]
+            [string]$FilePath,
+            [AllowNull()]
+            [string]$ContentHash
+        )
+
+        $checkpointQuery = @"
+INSERT INTO scan_checkpoint (
+    root,
+    path,
+    content_hash,
+    checkpointed_utc
+)
+VALUES (
+    @root,
+    @path,
+    @content_hash,
+    @checkpointed_utc
+)
+ON CONFLICT(root, path)
+DO UPDATE SET
+    content_hash = excluded.content_hash,
+    checkpointed_utc = excluded.checkpointed_utc;
+"@
+
+        [void](Invoke-SqliteQuery -DatabasePath $dbPath -Query $checkpointQuery -Parameters @{
+            root             = $CheckpointRoot
+            path             = $FilePath
+            content_hash     = $ContentHash
+            checkpointed_utc = (Get-Date).ToUniversalTime().ToString('o')
+        } -QueryType NonQuery)
+    }
+
+    for ($index = 0; $index -lt $mediaFiles.Count; $index++) {
+        $file = $mediaFiles[$index]
+        $checkpointRoot = Resolve-ScanRoot -FilePath $file.Path -ScanRoots $resolvedRoots
+
+        if ($ShowProgress) {
+            $processedIndex = $index + 1
+            $percentComplete = if ($summary.TotalFiles -gt 0) {
+                [math]::Floor(($processedIndex / $summary.TotalFiles) * 100)
+            }
+            else {
+                100
+            }
+
+            Write-Progress -Activity 'Scanning trackstash media files' -Status "$processedIndex of $($summary.TotalFiles)" -CurrentOperation $file.Path -PercentComplete $percentComplete
+        }
+
         if (-not $PSCmdlet.ShouldProcess($file.Path, 'Scan and persist media metadata')) {
             $summary.Skipped++
             continue
         }
 
         try {
+            if ($Resume) {
+                $alreadyCheckpointed = Invoke-SqliteQuery -DatabasePath $dbPath -Query 'SELECT 1 FROM scan_checkpoint WHERE root = @root AND path = @path;' -Parameters @{ root = $checkpointRoot; path = $file.Path } -QueryType Scalar
+                if ($alreadyCheckpointed) {
+                    $summary.Skipped++
+                    continue
+                }
+            }
+
             $contentHash = Get-TrackstashFileHash -Path $file.Path
             $existingId = Invoke-SqliteQuery -DatabasePath $dbPath -Query 'SELECT media_file_id FROM media_file WHERE content_hash = @content_hash;' -Parameters @{ content_hash = $contentHash } -QueryType Scalar
 
@@ -86,6 +183,10 @@ WHERE content_hash = @content_hash;
                     content_hash      = $contentHash
                 } -QueryType NonQuery)
 
+                if ($Resume) {
+                    Save-ScanCheckpoint -CheckpointRoot $checkpointRoot -FilePath $file.Path -ContentHash $contentHash
+                }
+
                 $summary.Skipped++
                 continue
             }
@@ -106,12 +207,27 @@ WHERE content_hash = @content_hash;
             }
 
             [void](Save-TrackstashRecord -DatabasePath $dbPath -MediaFile $mediaRecord -Metadata $metadata)
+
+            if ($Resume) {
+                Save-ScanCheckpoint -CheckpointRoot $checkpointRoot -FilePath $file.Path -ContentHash $contentHash
+            }
+
             $summary.Processed++
         }
         catch {
             $summary.Errors++
             Write-TrackstashLog -Level Error -Message "Failed to process file '$($file.Path)': $($_.Exception.Message)"
             continue
+        }
+    }
+
+    if ($ShowProgress) {
+        Write-Progress -Activity 'Scanning trackstash media files' -Completed
+    }
+
+    if ($Resume) {
+        foreach ($resolvedRoot in $resolvedRoots) {
+            [void](Invoke-SqliteQuery -DatabasePath $dbPath -Query 'DELETE FROM scan_checkpoint WHERE root = @root;' -Parameters @{ root = $resolvedRoot } -QueryType NonQuery)
         }
     }
 

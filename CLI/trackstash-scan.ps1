@@ -12,7 +12,13 @@ param(
     [switch]$Recurse,
 
     [Parameter()]
-    [switch]$ForceRescan
+    [switch]$ForceRescan,
+
+    [Parameter()]
+    [switch]$ShowProgress,
+
+    [Parameter()]
+    [switch]$Resume
 )
 
 Set-StrictMode -Version Latest
@@ -26,6 +32,8 @@ $scanParams = @{
     DatabasePath = $DatabasePath
     Recurse      = $Recurse
     ForceRescan  = $ForceRescan
+    ShowProgress = $ShowProgress
+    Resume       = $Resume
     Verbose      = $VerbosePreference -ne 'SilentlyContinue'
     WhatIf       = $WhatIfPreference
 }

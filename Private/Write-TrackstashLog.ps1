@@ -32,6 +32,7 @@ function Write-TrackstashLog {
     switch ($Level) {
         'Info' { Write-Verbose $formatted }
         'Warning' { Write-Warning $formatted }
-        'Error' { Write-Error $formatted }
+        # Force non-terminating behavior so per-file scan failures do not abort whole scans.
+        'Error' { Write-Error $formatted -ErrorAction Continue }
     }
 }
